@@ -19,7 +19,7 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 - **Datasets:** archive the current set and start fresh, or restore an old one.
 - **View and sensor:** **V** toggles raw / baseline-diff view. **↻ reconnect** (or **R**) reconnects the sensor.
 
-Episodes are saved as `episodes/<id>.npz` (frames + timestamps) and `<id>.json` (label). They are not included in this repo.
+Episodes are saved as `episodes/<id>.npz` (frames + timestamps) and `<id>.json` (label). The dataset is on Hugging Face: [Team-Mulberry/digit-tactile-nov13](https://huggingface.co/datasets/Team-Mulberry/digit-tactile-nov13).
 
 ## Training
 ```bash
