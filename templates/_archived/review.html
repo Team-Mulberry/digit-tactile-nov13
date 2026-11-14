@@ -1,0 +1,260 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>DIGIT Collector</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: #111; color: #ddd;
+         display: flex; gap: 24px; padding: 24px; }
+  .main { flex: 0 0 640px; }
+  #cam { width: 640px; height: 480px; border-radius: 8px; display: block; border: 3px solid #222; object-fit: contain; background: #000; }
+  #cam.rec { border-color: #e5484d; } #cam.review { border-color: #3b82f6; }
+  .bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; min-height: 30px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #444; }
+  .rec .dot { background: #e5484d; animation: p 1s infinite; } .rv .dot { background: #3b82f6; }
+  @keyframes p { 50% { opacity: .3; } }
+  input[type=text] { background: #1c1c1c; border: 1px solid #333; color: #eee; padding: 6px 10px; border-radius: 6px; width: 200px; }
+  .tabs span { padding: 3px 9px; border-radius: 4px; cursor: pointer; color: #888; }
+  .tabs span.on { background: #222; color: #fff; }
+  #review { display: none; margin-top: 10px; } body.rvmode #review { display: block; }
+  canvas, #raster { width: 640px; display: block; border-radius: 6px; background: #181818; }
+  #raster { height: 120px; margin-top: 6px; image-rendering: pixelated; }
+  #scrub { width: 640px; margin: 6px 0 0; accent-color: #3b82f6; }
+  .side { flex: 1; min-width: 280px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; }
+  h3 { margin: 0 0 8px; font-weight: 600; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .labels span { display: inline-block; padding: 2px 8px; margin: 0 4px 4px 0; border-radius: 4px; background: #222; cursor: pointer; }
+  .labels span.on { background: #3b82f6; color: #fff; }
+  ul { list-style: none; padding: 0; margin: 0; overflow-y: auto; }
+  li { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; gap: 8px; }
+  li:hover { background: #1a1a1a; } li.sel { background: #1e2a40; }
+  li .m { color: #777; font-size: 12px; } li .x { color: #555; padding: 0 4px; } li .x:hover { color: #e5484d; }
+  .unl { color: #e5a84d; font-style: italic; }
+  .keys { color: #666; font-size: 12px; margin-top: 12px; line-height: 1.9; }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; background: #e5a84d; }
+  .cdot.ok { background: #46a758; } .cdot.bad { background: #e5484d; }
+  button { background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; padding: 4px 10px; cursor: pointer; margin-left: auto; }
+  button:hover { background: #2a2a2a; }
+  #predbox { background: #181818; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+  #predbox h3 { display: flex; align-items: center; }
+  #plabel { font-size: 32px; font-weight: 600; color: #fff; margin: 4px 0 8px; }
+  #plabel.none { color: #555; font-size: 20px; }
+  .pb { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
+  .pb .n { width: 60px; color: #aaa; } .pb .t { flex: 1; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+  .pb .f { height: 100%; background: #3b82f6; transition: width .1s; } .pb .v { width: 36px; text-align: right; color: #777; }
+  .cbar { position: relative; height: 4px; background: #222; border-radius: 2px; margin-top: 10px; }
+  #cfill { height: 100%; background: #e5a84d; border-radius: 2px; } #cth { position: absolute; top: -3px; width: 2px; height: 10px; background: #fff; }
+  .m { color: #777; font-size: 12px; margin-top: 4px; }
+  kbd { background: #222; border-radius: 3px; padding: 0 5px; color: #bbb; }
+</style></head>
+<body>
+<div class="main">
+  <img id="cam">
+  <div class="bar" id="bar"><div class="dot"></div><span id="status">live</span><span style="flex:1"></span>
+    <span class="tabs" id="tabs"></span>
+    <label id="lblwrap">label <input type="text" id="label" placeholder="e.g. press, slide"></label></div>
+  <div id="review">
+    <input type="range" id="scrub" min="0" value="0">
+    <canvas id="sig" width="1280" height="160" style="height:80px"></canvas>
+    <img id="raster" title="raster: sensor rows × time">
+  </div>
+  <div class="keys">
+    <b>Live</b> &nbsp;<kbd>space</kbd> record/stop &nbsp;<kbd>L</kbd> type label &nbsp;<kbd>1</kbd>–<kbd>9</kbd> pick label &nbsp;<kbd>C</kbd> reconnect &nbsp;<kbd>B</kbd> reset baseline &nbsp;<kbd>F</kbd> force vectors<br>
+    <b>Review</b> &nbsp;<kbd>↑</kbd><kbd>↓</kbd> pick episode &nbsp;<kbd>P</kbd> play/pause &nbsp;<kbd>←</kbd><kbd>→</kbd> step
+    &nbsp;<kbd>V</kbd> view &nbsp;<kbd>1</kbd>–<kbd>9</kbd>/<kbd>R</kbd> relabel &nbsp;<kbd>⌫</kbd> delete &nbsp;<kbd>esc</kbd> back to live
+  </div>
+</div>
+<div class="side">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <span id="camdot" class="cdot"></span><span id="cam-s" style="color:#888">…</span>
+    <button id="recon" title="shortcut: C">reconnect</button></div>
+  <div id="predbox">
+    <h3>Live prediction <button id="rebase" title="shortcut: B — do it with nothing touching the sensor">reset baseline</button></h3>
+    <div id="plabel">—</div>
+    <div id="pbars"></div>
+    <div class="cbar"><div id="cfill"></div><div id="cth"></div></div>
+    <div id="ctext" class="m"></div>
+  </div>
+  <h3>Labels</h3><div class="labels" id="labels"></div>
+  <h3 style="margin-top:16px">Episodes <span id="count"></span></h3><ul id="eps"></ul>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const VIEWS = ["grid", "raw", "diff", "overlay", "edges", "force"];
+let eps = [], sel = -1, rec = false, recent = JSON.parse(localStorage.labels || "[]");
+let liveForce = localStorage.liveForce === "1";
+const liveSrc = () => "/stream" + (liveForce ? "?view=force&" : "?") + Date.now();
+let ep = null, fi = 0, playing = false, view = localStorage.view || "grid", relabeling = false;
+const post = (u, b) => fetch(u, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(b || {})}).then(r => r.json());
+const esc = s => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const reviewing = () => sel >= 0 && !rec;
+
+function remember(l) {
+  if (l && !recent.includes(l)) { recent.push(l); recent = recent.slice(-9); localStorage.labels = JSON.stringify(recent); }
+}
+function setLabel(l) {                        // live: label for the next recording
+  $("label").value = l; post("/api/label", {label: l}); remember(l); drawLabels();
+}
+async function relabel(l) {                   // review: change selected episode
+  if (!eps[sel]) return;
+  remember(l); await post("/api/relabel/" + eps[sel].id, {label: l}); eps[sel].label = l; drawEps(); drawLabels();
+}
+function pickLabel(l) { reviewing() ? relabel(l) : setLabel(l); }
+function drawLabels() {
+  const cur = reviewing() ? eps[sel]?.label : $("label").value;
+  $("labels").innerHTML = recent.map((l, i) => `<span class="${l === cur ? "on" : ""}" data-l="${esc(l)}">${i + 1} ${esc(l)}</span>`).join("");
+  $("labels").querySelectorAll("span").forEach(s => s.onclick = () => pickLabel(s.dataset.l));
+}
+function drawEps() {
+  $("count").textContent = `(${eps.length}${eps.filter(e => !e.label).length ? ", " + eps.filter(e => !e.label).length + " unlabeled" : ""})`;
+  $("eps").innerHTML = eps.map((e, i) => `<li class="${i === sel ? "sel" : ""}" data-i="${i}">
+    <span class="${e.label ? "" : "unl"}">${e.label ? esc(e.label) : "unlabeled"}</span>
+    <span><span class="m">${e.duration}s · ${e.frames}f · ${e.id.slice(9, 15).replace(/(..)(..)(..)/, "$1:$2:$3")}</span><span class="x" title="delete">✕</span></span></li>`).join("");
+  $("eps").querySelectorAll("li").forEach(li => {
+    li.onclick = ev => ev.target.classList.contains("x") ? del(+li.dataset.i) : select(+li.dataset.i);
+  });
+  $("eps").querySelector(".sel")?.scrollIntoView({block: "nearest"});
+}
+function toggleForce() {
+  liveForce = !liveForce; localStorage.liveForce = liveForce ? "1" : "0";
+  if (!ep) $("cam").src = liveSrc(); drawTabs();
+}
+function drawTabs() {
+  if (!reviewing()) {
+    $("tabs").innerHTML = `<span class="${liveForce ? "" : "on"}" data-f="0">camera</span><span class="${liveForce ? "on" : ""}" data-f="1">force vectors</span>`;
+    $("tabs").querySelectorAll("span").forEach(s => s.onclick = () => { if ((s.dataset.f === "1") !== liveForce) toggleForce(); });
+    return;
+  }
+  $("tabs").innerHTML = reviewing() ? VIEWS.map(v => `<span class="${v === view ? "on" : ""}" data-v="${v}">${v}</span>`).join("") : "";
+  $("tabs").querySelectorAll("span").forEach(s => s.onclick = () => { view = localStorage.view = s.dataset.v; drawTabs(); show(); });
+}
+
+async function select(i) {
+  if (rec) return;
+  playing = false;
+  sel = i;
+  document.body.classList.toggle("rvmode", sel >= 0);
+  $("lblwrap").style.display = sel >= 0 ? "none" : "";
+  drawEps(); drawLabels(); drawTabs();
+  if (sel < 0) { ep = null; $("cam").src = liveSrc(); $("cam").className = ""; drawTabs(); status(); return; }
+  const id = eps[sel].id;
+  const info = await fetch(`/ep/${id}/info`).then(r => r.json());
+  if (eps[sel]?.id !== id) return;
+  ep = {id, ...info}; fi = 0;
+  $("scrub").max = ep.n - 1; $("raster").src = `/ep/${id}/raster`; $("cam").className = "review";
+  show();
+}
+async function del(i) {
+  if (!eps[i]) return;
+  await post("/api/delete/" + eps[i].id);
+  eps.splice(i, 1);
+  if (sel >= 0) select(eps.length ? Math.min(i, eps.length - 1) : -1); else drawEps();
+}
+function status() {
+  if (rec) return;
+  $("bar").className = "bar" + (ep ? " rv" : "");
+  $("status").textContent = ep ? `${playing ? "▶" : "❚❚"} ${ep.t[fi].toFixed(2)}s / ${ep.t[ep.n - 1].toFixed(2)}s · frame ${fi + 1}/${ep.n}` : "live";
+}
+function show() {
+  if (!ep) return;
+  $("cam").src = `/ep/${ep.id}/frame/${fi}?view=${view}`;
+  $("scrub").value = fi; drawSig(); status();
+}
+function drawSig() {
+  const c = $("sig"), g = c.getContext("2d"), W = c.width, H = c.height, s = ep.signal;
+  const mx = Math.max(...s, 1e-6);
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = "#e5a84d"; g.lineWidth = 3; g.beginPath();
+  s.forEach((v, i) => { const x = i / (s.length - 1 || 1) * W, y = H - 10 - v / mx * (H - 20); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.stroke();
+  const px = fi / (s.length - 1 || 1) * W;
+  g.fillStyle = "#3b82f6"; g.fillRect(px - 1.5, 0, 3, H);
+  g.fillStyle = "#777"; g.font = "22px system-ui"; g.fillText("contact signal", 10, 26);
+}
+function step(d) { if (ep) { fi = Math.max(0, Math.min(ep.n - 1, fi + d)); show(); } }
+let last = 0;
+function tick(ts) {                          // real-time playback using recorded timestamps
+  if (playing && ep && ts - last >= ((ep.t[fi + 1] ?? 0) - ep.t[fi]) * 1000) {
+    last = ts;
+    if (fi >= ep.n - 1) fi = 0; else fi++;
+    show();
+  }
+  requestAnimationFrame(tick);
+}
+function drawPred(p) {
+  if (!p) { $("plabel").textContent = "no model — run train.py"; $("plabel").className = "none"; return; }
+  if (p.calibrating) { $("plabel").textContent = "calibrating — don't touch"; $("plabel").className = "none"; $("pbars").innerHTML = ""; return; }
+  $("plabel").textContent = p.label || "no contact"; $("plabel").className = p.label ? "" : "none";
+  const ps = Object.entries(p.probs);
+  const duels = p.duels || [];
+  $("pbars").innerHTML = (duels.length ? '<div class="m" style="margin:0 0 4px">one-vs-one models (left wins ← → right wins)</div>' +
+    duels.map(d => `<div class="pb"><span class="n" style="text-align:right;${d.p > .5 ? "color:#fff" : ""}">${esc(d.a)}</span>
+      <span class="t" style="position:relative"><span class="f" style="display:block;width:${d.p * 100}%"></span>
+      <span style="position:absolute;left:50%;top:0;width:1px;height:100%;background:#fff8"></span></span>
+      <span class="n" style="${d.p < .5 ? "color:#fff" : ""}">${esc(d.b)}</span></div>`).join("") +
+    '<div class="m" style="margin:8px 0 4px">vote share</div>' : "") +
+    ps.map(([k, v]) => `<div class="pb"><span class="n">${esc(k)}</span><span class="t"><span class="f" style="display:block;width:${v * 100}%"></span></span><span class="v">${Math.round(v * 100)}%</span></div>`).join("");
+  const mx = Math.max(p.thresh * 4, p.contact);
+  $("cfill").style.width = Math.min(100, p.contact / mx * 100) + "%"; $("cth").style.left = (p.thresh / mx * 100) + "%";
+  $("ctext").textContent = `contact ${p.contact.toFixed(1)} (threshold ${p.thresh})`;
+}
+const rebase = () => post("/api/rebase");
+$("rebase").onclick = e => { e.target.blur(); rebase(); };
+async function reconnect() {
+  await post("/api/reconnect");
+  if (!ep) setTimeout(() => $("cam").src = liveSrc(), 1500);   // refresh live feed
+}
+$("recon").onclick = e => { e.target.blur(); reconnect(); };
+$("scrub").oninput = e => { fi = +e.target.value; show(); };
+$("sig").onclick = e => { if (ep) { fi = Math.round(e.offsetX / e.target.clientWidth * (ep.n - 1)); show(); } };
+
+async function poll() {
+  const s = await fetch("/api/state").then(r => r.json());
+  rec = s.rec;
+  drawPred(s.pred);
+  $("cam-s").textContent = "sensor " + s.cam + (s.rolls ? ` · ${s.rolls} frames re-aligned` : "");
+  $("camdot").className = "cdot" + (s.cam.startsWith("connected") ? " ok" : s.cam === "disconnected" ? " bad" : "");
+  if (rec) {
+    $("bar").className = "bar rec"; $("cam").className = "rec";
+    $("status").textContent = `recording ${s.elapsed.toFixed(1)}s · ${s.n} frames`;
+  } else status();
+  const sig = JSON.stringify(s.episodes.map(e => [e.id, e.label]));
+  if (sig !== JSON.stringify(eps.map(e => [e.id, e.label]))) {
+    const cur = eps[sel]?.id; eps = s.episodes;
+    if (sel >= 0) sel = Math.max(0, eps.findIndex(e => e.id === cur));
+    drawEps(); drawLabels();
+  }
+}
+
+$("label").addEventListener("change", e => setLabel(e.target.value.trim()));
+$("label").addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === "Escape") e.target.blur();
+});
+document.addEventListener("keydown", async e => {
+  if (document.activeElement.tagName === "INPUT" && document.activeElement.type === "text") return;
+  const k = e.key;
+  if (k === " ") {
+    e.preventDefault();
+    if (reviewing()) select(-1);                 // space from review returns to live and starts recording
+    const r = await post("/api/toggle"); rec = r.rec;
+    if (r.saved) { eps.unshift(r.saved); drawEps(); }
+    poll();
+  } else if (/^[1-9]$/.test(k) && recent[k - 1]) pickLabel(recent[k - 1]);
+  else if (k === "l" || k === "L") { e.preventDefault(); if (reviewing()) select(-1); $("label").focus(); $("label").select(); }
+  else if ((k === "r" || k === "R") && reviewing()) {
+    e.preventDefault();
+    const l = prompt("Label for this episode:", eps[sel].label || "");
+    if (l !== null) relabel(l.trim());
+  }
+  else if (k === "ArrowDown") { e.preventDefault(); select(Math.min(sel + 1, eps.length - 1)); }
+  else if (k === "ArrowUp") { e.preventDefault(); select(Math.max(sel - 1, eps.length ? 0 : -1)); }
+  else if (k === "ArrowRight") { e.preventDefault(); step(e.shiftKey ? 10 : 1); }
+  else if (k === "ArrowLeft") { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
+  else if ((k === "p" || k === "P" || k === "Enter") && ep) { playing = !playing; last = 0; status(); }
+  else if ((k === "v" || k === "V") && ep) { view = localStorage.view = VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.length]; drawTabs(); show(); }
+  else if (k === "Escape") select(-1);
+  else if (k === "c" || k === "C") reconnect();
+  else if (k === "b" || k === "B") rebase();
+  else if ((k === "f" || k === "F") && !reviewing()) toggleForce();
+  else if (k === "Backspace" || k === "Delete") { e.preventDefault(); del(sel >= 0 ? sel : 0); }
+});
+$("cam").src = liveSrc(); drawTabs(); drawLabels(); poll(); setInterval(poll, 300); requestAnimationFrame(tick);
+</script>
+</body></html>

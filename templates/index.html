@@ -1,0 +1,393 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>DIGIT Collect</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 -apple-system, system-ui, sans-serif; background: #111; color: #ddd;
+         display: flex; gap: 28px; padding: 28px; height: 100vh; }
+  .left { flex: 0 0 640px; }
+  #cam { width: 640px; height: 480px; border-radius: 10px; display: block; border: 4px solid #222; background: #000; }
+  body.rec #cam { border-color: #e5484d; } body.rec #st { color: #e5484d; }
+  .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 32px; }
+  .h { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #888; }
+  .pill { font-size: 12px; color: #888; padding: 3px 10px; border-radius: 99px; background: #1a1a1a; }
+  .rc { border: 0; cursor: pointer; color: #ccc; } .rc:hover { background: #2a2a2a; color: #fff; }
+  .pill.ok { color: #46a758; } .pill.bad { color: #e5484d; }
+  .statusrow { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  #st { font-size: 22px; font-weight: 600; } #sub { color: #777; font-size: 13px; margin-top: 2px; min-height: 18px; }
+  .chip { background: #1e2a40; color: #9cc0ff; padding: 4px 12px; border-radius: 99px; font-size: 14px; }
+  body.rec .chip { background: #3a1d1f; color: #ff9a9c; }
+  .panel { display: flex; gap: 22px; align-items: center; background: #181818; border-radius: 10px; padding: 12px 14px; margin-top: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #aaa; } .field.grow { flex: 1; }
+  .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; }
+  .right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .card { background: #1a1a1a; border: 3px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer; position: relative; }
+  .card.on { border-color: #3b82f6; }
+  .card .img { aspect-ratio: 4/3; background: #222 center/cover; display: flex; align-items: center; justify-content: center; color: #555; font-size: 13px; }
+  .card .nm { padding: 6px 10px; display: flex; justify-content: space-between; }
+  .card .k { position: absolute; top: 6px; left: 6px; background: #000a; border-radius: 4px; padding: 0 6px; font-size: 12px; }
+  .card .cnt { color: #888; padding: 0 4px; border-radius: 4px; } .card .cnt:hover { background: #333; color: #fff; }
+  .ep { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  .ep:hover { background: #222; } .ep.sel { background: #1e2a40; }
+  .ep .t { flex: 1; } .ep .x { color: #666; padding: 0 6px; } .ep .x:hover { color: #e5484d; }
+  #ep-img { width: 100%; aspect-ratio: 4/3; border-radius: 8px; background: #000; display: block; object-fit: contain; }
+  #ep-bar { height: 4px; background: #222; border-radius: 2px; margin: 6px 0 10px; } #ep-fill { height: 100%; width: 0; background: #3b82f6; border-radius: 2px; }
+  .card .snap { position: absolute; top: 6px; right: 6px; background: #000a; border-radius: 4px; padding: 0 6px; font-size: 12px; opacity: 0; }
+  .card:hover .snap { opacity: 1; }
+  .card .snap.del { right: 38px; } .card .snap.del:hover { background: #e5484d; }
+  .add { border: 2px dashed #333; display: flex; align-items: center; justify-content: center; color: #666; min-height: 150px; }
+  .seg { display: inline-flex; background: #222; border-radius: 6px; padding: 2px; }
+  .seg span { padding: 4px 12px; border-radius: 5px; cursor: pointer; }
+  .seg span.on { background: #3b82f6; color: #fff; }
+  .panel input { width: 64px; margin: 0; padding: 4px 6px; display: inline-block; }
+  .cbar { position: relative; height: 8px; margin: 5px 0; background: #222; border-radius: 3px; }
+  #cfill { height: 100%; width: 0; background: #e5a84d; border-radius: 3px; }
+  #cth { position: absolute; top: -3px; width: 2px; height: 12px; background: #fff; display: none; }
+  .last { margin-top: auto; color: #888; font-size: 13px; padding-top: 16px; }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 12px; color: #666; font-size: 12px; margin-top: 14px; } kbd { background: #222; border-radius: 3px; padding: 0 5px; color: #aaa; }
+  a { color: #666; }
+  #modal { position: fixed; inset: 0; background: #000c; display: none; align-items: center; justify-content: center; }
+  #modal.on { display: flex; }
+  .box { background: #1a1a1a; padding: 20px; border-radius: 12px; width: 520px; }
+  .box video { width: 100%; border-radius: 8px; background: #000; }
+  input, select { background: #111; border: 1px solid #333; color: #eee; padding: 8px 10px; border-radius: 6px; width: 100%; margin: 6px 0; font-size: 15px; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  button.g { background: #333; }
+  .mod { position: fixed; inset: 0; background: #000c; display: none; align-items: center; justify-content: center; }
+  .mod.on { display: flex; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: #222; margin-top: 8px; }
+  .row.cur { background: #1e2a40; margin-top: 14px; } .m { color: #888; font-size: 12px; }
+</style></head>
+<body>
+<div class="left">
+  <div class="bar">
+    <span class="seg" id="vseg"><span data-v="raw">raw</span><span data-v="diff">baseline diff</span></span>
+    <span><span class="pill" id="sensor"></span> <button class="pill rc" id="rcbtn" title="reconnect sensor (R)">↻ reconnect</button></span>
+  </div>
+  <img id="cam">
+  <div class="statusrow">
+    <div><div id="st">Ready</div><div id="sub"></div></div>
+    <span class="chip" id="chip"></span>
+  </div>
+  <div class="panel">
+    <div class="field"><span class="lbl">Mode</span><span class="seg" id="seg"><span data-m="manual">manual</span><span data-m="auto">auto</span></span></div>
+    <div class="field"><span class="lbl">Min press</span><span><input id="hold" type="number" min="0" max="5" step="0.1" value="0.5"> s</span></div>
+    <div class="field"><span class="lbl">Padding</span><span><input id="pad" type="number" min="0" max="5" step="0.1" value="0.5"> s</span></div>
+    <div class="field"><span class="lbl">Sensitivity <span id="sensv"></span></span>
+      <span><input id="sens" type="range" min="0.5" max="2" step="0.05" value="1.35" style="width:110px;padding:0;vertical-align:middle">
+      <a href="#" id="sensr" class="m" style="margin-left:4px">default</a></span></div>
+    <div class="field grow"><span class="lbl">Contact</span><div class="cbar" title="white tick = auto threshold"><div id="cfill"></div><div id="cth"></div></div></div>
+  </div>
+  <div class="keys">
+    <span><kbd>space</kbd> record</span><span><kbd>1–9</kbd> class</span><span><kbd>⌫</kbd> delete last</span>
+    <span><kbd>A</kbd> auto / manual</span><span><kbd>V</kbd> raw / diff</span><span><kbd>E</kbd> episodes</span>
+    <span><kbd>N</kbd> new class</span><span><kbd>P</kbd> class photo</span><span><kbd>D</kbd> datasets</span><span><kbd>X</kbd> delete class</span>
+  </div>
+</div>
+<div class="right">
+  <div class="bar"><b class="h">Classes</b><button class="g" onclick="openDs()">Datasets</button></div>
+  <div class="cards" id="cards"></div>
+  <div class="last" id="last"></div>
+</div>
+
+<div id="modal"><div class="box">
+  <div id="m-title" style="font-weight:600;margin-bottom:6px"></div>
+  <input id="m-name" placeholder="class name, e.g. hard sponge">
+  <video id="m-video" autoplay playsinline muted></video>
+  <select id="m-dev"></select>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+    <button class="g" onclick="closeModal()">cancel (esc)</button>
+    <button id="m-skip" class="g" onclick="finish(false)">no photo</button>
+    <button onclick="finish(true)">snap & save (enter)</button>
+  </div>
+</div></div>
+
+<div id="ds" class="mod"><div class="box" style="width:560px;max-height:80vh;overflow:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center"><b>Datasets</b><button class="g" onclick="closeDs()">close (esc)</button></div>
+  <div class="row cur"><div><b>current</b><div class="m" id="ds-cur"></div></div>
+    <div style="display:flex;gap:6px;align-items:center"><input id="ds-name" placeholder="name (optional)" style="width:160px;margin:0">
+    <button onclick="archive()">archive &amp; clear</button></div></div>
+  <div class="m" style="margin:14px 0 6px">archived — restoring auto-archives whatever is current first</div>
+  <div id="ds-list"></div>
+</div></div>
+<div id="eps" class="mod"><div class="box" style="width:600px;max-height:90vh;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b id="eps-title"></b><button class="g" onclick="closeEps()">close (esc)</button></div>
+  <img id="ep-img"><div id="ep-bar"><div id="ep-fill"></div></div>
+  <div id="eps-list" style="overflow:auto;flex:1"></div>
+  <div class="m" style="margin-top:8px"><kbd>↑</kbd><kbd>↓</kbd> select &nbsp; <kbd>space</kbd> play / pause &nbsp; <kbd>⌫</kbd> delete</div>
+</div></div>
+<div id="dc" class="mod"><div class="box" style="width:400px">
+  <div id="dc-msg" style="margin-bottom:16px"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="g" onclick="closeDc()">cancel (esc)</button>
+    <button style="background:#e5484d" onclick="delClass()">delete (enter)</button></div>
+</div></div>
+<script>
+const $ = id => document.getElementById(id);
+const post = (u, b) => fetch(u, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(b || {})}).then(r => r.json());
+const esc = s => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+let mode = "manual", lastAuto = null, view = localStorage.view2 || "raw";
+function setView(v) {
+  view = localStorage.view2 = v; $("cam").src = "/stream?view=" + v + "&" + Date.now();
+  $("vseg").querySelectorAll("span").forEach(x => x.classList.toggle("on", x.dataset.v === v));
+}
+let classes = [], cur = localStorage.cur || "", rec = false, lastEp = null, modalFor = null, stream = null, ver = Date.now();
+
+async function load() {
+  classes = await fetch("/api/classes").then(r => r.json());
+  if (!classes.find(c => c.name === cur)) cur = classes[0]?.name || "";
+  if (cur) post("/api/label", {label: cur});
+  draw();
+}
+function draw() {
+  $("cards").innerHTML = classes.map((c, i) => `
+    <div class="card ${c.name === cur ? "on" : ""}" data-n="${esc(c.name)}">
+      <div class="img" style="${c.img ? `background-image:url('/classes/${encodeURIComponent(c.name)}.jpg?${ver}')` : ""}">${c.img ? "" : "no photo — P"}</div>
+      <span class="k">${i + 1}</span><span class="snap" data-snap="1">📷</span><span class="snap del" data-del="1" title="delete class">🗑</span>
+      <div class="nm"><b>${esc(c.name)}</b><span class="cnt" data-eps="1" title="review episodes (E)">${c.count} ▸</span></div></div>`).join("")
+    + `<div class="card add" id="add">+ new class (N)</div>`;
+  $("cards").querySelectorAll(".card[data-n]").forEach(el => el.onclick = e =>
+    e.target.dataset.del ? askDelClass(el.dataset.n) : e.target.dataset.snap ? openModal(el.dataset.n) : e.target.dataset.eps ? openEps(el.dataset.n) : select(el.dataset.n));
+  $("add").onclick = () => openModal(null);
+  drawStatus();
+}
+function drawStatus() {
+  $("st").textContent = rec ? "Recording" : !cur ? "Add a class to start" : mode === "auto" ? "Waiting for touch" : "Ready";
+  $("chip").textContent = cur; $("chip").style.display = cur ? "" : "none";
+  $("seg").querySelectorAll("span").forEach(x => x.classList.toggle("on", x.dataset.m === mode));
+}
+function select(n) { if (rec) return; cur = localStorage.cur = n; post("/api/label", {label: n}); draw(); }
+
+async function toggle() {
+  if (!cur) return openModal(null);
+  if (!rec) await post("/api/label", {label: cur});
+  const r = await post("/api/toggle"); rec = r.rec;
+  document.body.classList.toggle("rec", rec);
+  if (r.saved) { lastEp = r.saved; showLast(); load(); }
+  draw();
+}
+function showLast(msg) {
+  $("last").innerHTML = msg || (lastEp ? `Last episode: <b>${esc(lastEp.label)}</b>, ${lastEp.duration}s, ${lastEp.frames} frames &nbsp; <kbd>⌫</kbd> delete` : "");
+}
+async function delLast() {
+  if (!lastEp || rec) return;
+  await post("/api/delete/" + lastEp.id); showLast(`deleted ${esc(lastEp.label)} episode`); lastEp = null; load();
+}
+async function poll() {
+  const s = await fetch("/api/state").then(r => r.json()).catch(() => null);
+  if (!s) return;
+  mode = s.mode;
+  if (document.activeElement !== $("pad")) $("pad").value = s.padding;
+  if (document.activeElement !== $("hold")) $("hold").value = s.min_press;
+  if (document.activeElement !== $("sens")) $("sens").value = s.sensitivity;
+  $("sensv").textContent = (+s.sensitivity).toFixed(2) + "×";
+  if (s.rec !== rec) { rec = s.rec; document.body.classList.toggle("rec", rec); }
+  $("sub").textContent = rec ? `${s.elapsed.toFixed(1)} s, ${s.n} frames` : mode === "auto" ? `starts after ${s.min_press} s of steady pressure, stops after ${s.padding} s quiet` : "press space to record";
+  const ok = s.cam.startsWith("connected");
+  $("sensor").textContent = ok ? "sensor connected" : "sensor " + s.cam; $("sensor").className = "pill " + (ok ? "ok" : s.cam === "disconnected" ? "bad" : "");
+  if (s.auto_saved && s.auto_saved.id !== lastAuto) {
+    if (lastAuto !== null) { lastEp = s.auto_saved; showLast(); load(); }
+    lastAuto = s.auto_saved.id;
+  } else if (lastAuto === null) lastAuto = s.auto_saved?.id || "";
+  const mx = Math.max((s.thresh || 5) * 4, s.contact);
+  $("cfill").style.width = Math.min(100, s.contact / mx * 100) + "%";
+  $("cfill").style.background = s.thresh && s.contact >= s.thresh ? "#46a758" : "#e5a84d";
+  $("cth").style.display = s.thresh ? "block" : "none"; if (s.thresh) $("cth").style.left = (s.thresh / mx * 100) + "%";
+  drawStatus();
+}
+setInterval(poll, 150);
+async function setMode(m) {
+  const r = await post("/api/settings", {mode: m});
+  if (r.ok) { mode = r.mode; draw(); } else showLast(esc(r.error || ""));
+}
+$("seg").querySelectorAll("span").forEach(x => x.onclick = () => setMode(x.dataset.m));
+$("vseg").querySelectorAll("span").forEach(x => x.onclick = () => setView(x.dataset.v));
+setView(view);
+$("pad").onchange = e => post("/api/settings", {padding: e.target.value});
+$("pad").onkeydown = e => { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); };
+$("hold").onchange = e => post("/api/settings", {min_press: e.target.value});
+$("hold").onkeydown = $("pad").onkeydown;
+$("sens").oninput = e => { $("sensv").textContent = (+e.target.value).toFixed(2) + "×"; post("/api/settings", {sensitivity: e.target.value}); };
+$("sens").onchange = e => e.target.blur();
+$("sensr").onclick = e => { e.preventDefault(); $("sens").value = 1.35; post("/api/settings", {sensitivity: 1.35}); };
+
+// ---- class photo via webcam (browser camera; pick a camera that isn't the DIGIT) ----
+async function startCam(id) {
+  stream?.getTracks().forEach(t => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({video: id ? {deviceId: {exact: id}} : true});
+  $("m-video").srcObject = stream;
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  const active = stream.getVideoTracks()[0].getSettings().deviceId;
+  $("m-dev").innerHTML = devs.map(d => `<option value="${d.deviceId}" ${d.deviceId === active ? "selected" : ""}>${esc(d.label || "camera")}</option>`).join("");
+  return devs;
+}
+async function openModal(name) {
+  if (rec) return;
+  modalFor = name;
+  $("m-title").textContent = name ? `Photo for "${name}"` : "New class";
+  $("m-name").style.display = name ? "none" : ""; $("m-name").value = "";
+  $("m-skip").style.display = name ? "none" : "";
+  $("modal").classList.add("on");
+  if (!name) $("m-name").focus();
+  try {
+    const devs = await startCam(localStorage.photoCam);
+    if (!devs.find(d => d.deviceId === localStorage.photoCam)) {   // default: first camera that isn't the DIGIT
+      const pick = devs.find(d => !/digit/i.test(d.label)) || devs[0];
+      if (pick) { localStorage.photoCam = pick.deviceId; await startCam(pick.deviceId); }
+    }
+  } catch (e) { $("m-title").textContent += " (no webcam access)"; }
+}
+$("m-dev").onchange = e => { localStorage.photoCam = e.target.value; startCam(e.target.value); };
+function closeModal() { stream?.getTracks().forEach(t => t.stop()); stream = null; $("modal").classList.remove("on"); }
+async function finish(withPhoto) {
+  let name = modalFor;
+  if (!name) {
+    const r = await post("/api/classes", {name: $("m-name").value});
+    if (!r.ok) { $("m-title").textContent = r.error; return; }
+    name = r.name;
+  }
+  if (withPhoto && stream) {
+    const v = $("m-video"), c = document.createElement("canvas");
+    c.width = 400; c.height = Math.round(400 * v.videoHeight / v.videoWidth);
+    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    await fetch(`/api/classes/${encodeURIComponent(name)}/image`, {method: "POST", body: blob});
+    ver = Date.now();
+  }
+  closeModal(); select(name); load();
+}
+
+// ---- per-class episode review ----
+let epsList = [], epSel = 0, player = null;
+async function openEps(name) {
+  if (rec) return;
+  const all = await fetch("/api/episodes").then(r => r.json());
+  epsList = all.filter(e => e.label === name); epSel = 0;
+  $("eps-title").textContent = `${name} — ${epsList.length} episodes`;
+  $("eps").classList.add("on"); drawEps(); play(false);
+}
+function drawEps() {
+  $("eps-list").innerHTML = epsList.map((e, i) => `<div class="ep ${i === epSel ? "sel" : ""}" data-i="${i}">
+    <span>${i === epSel && player?.on ? "❚❚" : "▶"}</span>
+    <span class="t">${e.id.slice(9, 15).replace(/(..)(..)(..)/, "$1:$2:$3")}</span>
+    <span class="m">${e.duration} s</span><span class="m">${e.frames} frames</span><span class="x">✕</span></div>`).join("") || '<div class="m">no episodes</div>';
+  $("eps-list").querySelectorAll(".ep").forEach(el => el.onclick = ev => {
+    const i = +el.dataset.i;
+    if (ev.target.classList.contains("x")) return delEp(i);
+    if (i === epSel) play(!player?.on); else { epSel = i; play(true); }
+  });
+  $("eps-list").querySelector(".sel")?.scrollIntoView({block: "nearest"});
+}
+async function play(on) {
+  if (player) player.on = false;
+  const e = epsList[epSel];
+  if (!e) { $("ep-img").removeAttribute("src"); return; }
+  const info = await fetch(`/ep/${e.id}/info`).then(r => r.json());
+  const p = player = {on, i: 0, t: info.t, n: info.n, id: e.id};
+  const show = () => { $("ep-img").src = `/ep/${p.id}/frame/${p.i}?view=raw`; $("ep-fill").style.width = (p.i / (p.n - 1 || 1) * 100) + "%"; };
+  show(); drawEps();
+  const t0 = performance.now();
+  const tick = () => {
+    if (player !== p || !p.on) return;
+    const el = (performance.now() - t0) / 1000;
+    while (p.i < p.n - 1 && p.t[p.i + 1] <= el) p.i++;
+    show();
+    if (p.i >= p.n - 1) { p.on = false; drawEps(); return; }
+    requestAnimationFrame(tick);
+  };
+  if (on) requestAnimationFrame(tick);
+}
+async function delEp(i) {
+  const e = epsList[i]; if (!e) return;
+  await post("/api/delete/" + e.id);
+  epsList.splice(i, 1); epSel = Math.min(epSel, epsList.length - 1);
+  if (lastEp?.id === e.id) { lastEp = null; showLast(); }
+  $("eps-title").textContent = $("eps-title").textContent.replace(/\d+ episodes/, epsList.length + " episodes");
+  drawEps(); play(false); load();
+}
+function closeEps() { if (player) player.on = false; $("eps").classList.remove("on"); }
+
+// ---- delete class (moves episodes + photo to trash/) ----
+let dcName = null;
+function askDelClass(name) {
+  if (rec) return;
+  const c = classes.find(x => x.name === name); dcName = name;
+  $("dc-msg").innerHTML = `Delete class <b>${esc(name)}</b> and its <b>${c?.count || 0}</b> episodes?<div class="m" style="margin-top:6px">They're moved to the trash/ folder, not destroyed.</div>`;
+  $("dc").classList.add("on");
+}
+function closeDc() { $("dc").classList.remove("on"); dcName = null; }
+async function delClass() {
+  if (!dcName) return;
+  const r = await post(`/api/classes/${encodeURIComponent(dcName)}/delete`);
+  if (r.ok) { showLast(`deleted class ${esc(dcName)} (${r.episodes} episodes moved to trash/)`); if (lastEp?.label === dcName) lastEp = null; }
+  closeDc(); load();
+}
+
+const fmt = c => Object.entries(c).map(([k, v]) => `${esc(k || "unlabeled")} ${v}`).join(", ") || "empty";
+async function openDs() {
+  if (rec) return;
+  const d = await fetch("/api/datasets").then(r => r.json());
+  $("ds-cur").textContent = fmt(d.current);
+  $("ds-list").innerHTML = d.archives.map(a => `<div class="row"><div><b>${esc(a.id)}</b><div class="m">${fmt(a.counts)}</div></div>
+    <button class="g" data-id="${esc(a.id)}">restore</button></div>`).join("") || '<div class="m">none yet</div>';
+  $("ds-list").querySelectorAll("button").forEach(b => b.onclick = () => restore(b.dataset.id));
+  $("ds").classList.add("on");
+}
+function closeDs() { $("ds").classList.remove("on"); $("ds-name").blur(); }
+async function archive() {
+  const r = await post("/api/archive", {name: $("ds-name").value});
+  if (!r.ok) { $("ds-cur").textContent = r.error; return; }
+  $("ds-name").value = ""; lastEp = null; showLast(`archived as ${esc(r.id)}`); await load(); openDs();
+}
+async function restore(id) {
+  const r = await post("/api/restore/" + encodeURIComponent(id));
+  if (r.ok) { lastEp = null; showLast(`restored ${esc(id)}` + (r.autosaved ? ` (previous saved as ${esc(r.autosaved)})` : "")); await load(); openDs(); }
+}
+
+document.addEventListener("keydown", e => {
+  if ($("dc").classList.contains("on")) {
+    e.preventDefault();
+    if (e.key === "Escape") closeDc(); else if (e.key === "Enter") delClass();
+    return;
+  }
+  if ($("eps").classList.contains("on")) {
+    const k = e.key; e.preventDefault();
+    if (k === "Escape") closeEps();
+    else if (k === "ArrowDown" && epSel < epsList.length - 1) { epSel++; play(true); }
+    else if (k === "ArrowUp" && epSel > 0) { epSel--; play(true); }
+    else if (k === " " || k === "Enter") play(!player?.on);
+    else if (k === "Backspace" || k === "Delete") delEp(epSel);
+    return;
+  }
+  if ($("ds").classList.contains("on")) {
+    if (e.key === "Escape") closeDs();
+    else if (e.key === "Enter" && document.activeElement === $("ds-name")) archive();
+    return;
+  }
+  if ($("modal").classList.contains("on")) {
+    if (e.key === "Escape") closeModal();
+    else if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    return;
+  }
+  if (["pad", "hold"].includes(document.activeElement.id)) return;
+  if (document.activeElement.id === "sens") $("sens").blur();
+  const k = e.key;
+  if (k === "v" || k === "V") { e.preventDefault(); setView(view === "raw" ? "diff" : "raw"); }
+  else if (k === "a" || k === "A") { e.preventDefault(); setMode(mode === "auto" ? "manual" : "auto"); }
+  else if (k === " ") { e.preventDefault(); toggle(); }
+  else if (/^[1-9]$/.test(k) && classes[k - 1]) select(classes[k - 1].name);
+  else if (k === "Backspace" || k === "Delete") { e.preventDefault(); delLast(); }
+  else if (k === "n" || k === "N") { e.preventDefault(); openModal(null); }
+  else if ((k === "p" || k === "P") && cur) { e.preventDefault(); openModal(cur); }
+  else if (k === "d" || k === "D") { e.preventDefault(); openDs(); }
+  else if ((k === "e" || k === "E") && cur) { e.preventDefault(); openEps(cur); }
+  else if ((k === "x" || k === "X") && cur) { e.preventDefault(); askDelClass(cur); }
+});
+load();
+</script>
+<script>
+function reconnect(){ fetch("/api/reconnect",{method:"POST"}); const b=document.getElementById("rcbtn"); b.textContent="↻ reconnecting…"; setTimeout(()=>b.textContent="↻ reconnect",4000); }
+document.getElementById("rcbtn").onclick=reconnect;
+document.addEventListener("keydown",e=>{ if((e.key==="r"||e.key==="R")&&!e.metaKey&&!e.ctrlKey&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)&&!document.querySelector(".modal.open, .modal:not([hidden])[style*=flex]")) reconnect(); });
+</script>
+</body></html>
